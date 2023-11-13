@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wonderland</title>
+    <style>
+        #title {
+            text-align: center;
+        }
+        #preview-frame {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            border: none;
+        }
+        .button-group {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translate(-50%, 0);
+            display: flex;    /* div 안의 버튼들을 가로로 배치 */
+            justify-content: space-between; /* 버튼들 사이에 동일한 간격을 둠 */
+        }
+        .button-group button {
+            width: 100px;     /* 각 버튼의 폭 설정 */
+            height: 40px;     /* 각 버튼의 높이 설정 */
+            font-size: 17px;  /* 버튼 내 텍스트 크기 설정 */
+            background-color: transparent; /* 백그라운드 색을 투명하게 설정 */
+            border: none; /* 버튼의 테두리 없애기 */
+        }
+    </style>
+</head>
+<body>
+    <h3 id="title">Wonderland</h3>
+    <h5 id="title">random(shift + r) / open(shift + o)</h5>
+    <label for="url-input">📝</label>
+    <input type="text" id="url-input" placeholder="https://nesoy.github.io">
+
+    <iframe id="preview-frame" src="https://nesoy.github.io"></iframe>
+    
+    <div class="button-group">
+        <button onclick="loadRandomPost()"><i>🎲</i></button>
+        <button onclick="openInNewTab()"><i>🌊</i></button>
+    </div>
+
+    <script>
+        function loadRandomPost() {
+            let blogList = findData();
+            let naverBlogId = shuffleArray(blogList)[0];
+            setRandomPost(naverBlogId);
+        }
+
+        function getRandomUrl() {
+            var defaultRandomUrl = "https://nesoy.github.io";
+            var randomUrl = document.getElementById("url-input").value || defaultRandomUrl;
+            if (randomUrl.startsWith("http://")) {
+                return "https://" + randomUrl.substring(7);
+            } else if (!randomUrl.startsWith("https://")) {
+                return "https://" + randomUrl;
+            } else {
+                return randomUrl;
+            }
+        }
+
+        function openInNewTab() {
+            window.open(document.getElementById('preview-frame').src, '_blank');
+        }
+
+        async function setRandomPost(author) {
+            try {
+                const totalPostCount = await getPostCount(author);
+                setRandomNaverBlogUrl(author, totalPostCount)
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        async function getPostCount(author) {
+            try {
+                const BLOG_DOMAIN = 'https://blog.naver.com';
+                const URL = `${BLOG_DOMAIN}/PostTitleListAsync.naver?blogId=${author}`;
+                const response = await fetch(URL);
+                const data = await response.text();
+        
+                const lines = data.split('\n');
+                for (const line of lines) {
+                    const match = line.match(/"totalCount":"(\d+)"/);
+                    if (match) {
+                        return parseInt(match[1], 10);
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching blog data:', error);
+            }
+        }
+
+        function setRandomNaverBlogUrl(author, totalPostCounts) {
+            const BLOG_DOMAIN = 'https://blog.naver.com';
+            const COUNT_PER_PAGE = 5;
+            const CATEGORY_NO = 0;
+            const TOTAL_PAGE_COUNTS = Math.ceil(totalPostCounts / COUNT_PER_PAGE);
+            const CURRENT_PAGE = Math.floor(Math.random() * TOTAL_PAGE_COUNTS) + 1;
+
+            // URL
+            const URL = `${BLOG_DOMAIN}/PostTitleListAsync.naver?blogId=${author}&viewdate=&currentPage=${CURRENT_PAGE}&categoryNo=${CATEGORY_NO}&parentCategoryNo=&countPerPage=${COUNT_PER_PAGE}`;
+            
+            // Fetch JSON response from API and select a random post
+            fetch(URL)
+                .then(response => response.text())
+                .then(data => {
+                    let ids = getblogIds(data);
+                    let shuffleId = shuffleArray(ids)[0]                    
+                    let url = `${BLOG_DOMAIN}/${author}/${shuffleId}`
+                    settingUrl(url);
+                });
+        }
+
+        function getblogIds(input) {
+            let postIds = [];
+            const lines = input.split('\n');
+            lines.forEach(line => {
+                const matches = line.match(/"logNo":"(\d+)"/g);
+                matches.forEach(match => {
+                    postIds.push(match.replace(/[^0-9]/g, ''));
+                });
+            });
+
+            return postIds;
+        }
+
+        function shuffleArray(array) {
+            return array.sort(() => Math.random() - 0.5);
+        }
+
+        function settingUrl(url) {
+            let iframe = document.getElementById("preview-frame");
+            iframe.src = url;
+        }
+
+        function initData() {
+            if (!localStorage.getItem('blog')) {
+                const initialValue = [
+                    "jeunkim",
+                    "ranto28",
+                    "bizucafe"
+                ];
+                localStorage.setItem('blog', JSON.stringify(initialValue));
+            }
+        }
+
+        function saveData(domain) {
+            let data = findData();
+            localStorage.setItem('blog', JSON.stringify(data));
+        }
+
+        function findData() {
+            let data = localStorage.getItem('blog');
+            return JSON.parse(data);
+        }
+
+        initData();
+
+        document.addEventListener("keydown", function(event) {
+            if (event.keyCode === 82 && event.shiftKey) {
+                loadRandomPost()
+            } else if (event.keyCode === 79 && event.shiftKey) {
+                openInNewTab()
+            }
+        });
+    </script>
+</body>
+</html>
